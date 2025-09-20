@@ -3,6 +3,7 @@ import { ChatMessage } from "./ChatMessage";
 import { BoatInput } from "./BoatInput";
 import { OceanBackground } from "./OceanBackground";
 import { toast } from "sonner";
+import { v4 as uuidv4 } from 'uuid';
 
 interface Message {
   id: string;
@@ -33,6 +34,7 @@ export const OceanChatbot = () => {
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [conversationId, setConversationId] = useState<string>(uuidv4());
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -53,19 +55,43 @@ export const OceanChatbot = () => {
     setMessages(prev => [...prev, userMessage]);
     setIsTyping(true);
 
-    // Simulate bot response delay
-    setTimeout(() => {
+    try {
+      const response = await fetch("http://localhost:8000/chat/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: text,
+          role: "user",
+          conversation_id: conversationId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to get response from AI.");
+      }
+
+      const data = await response.json();
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: BOT_RESPONSES[Math.floor(Math.random() * BOT_RESPONSES.length)],
+        text: data.response,
         isUser: false,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       setMessages(prev => [...prev, botResponse]);
-      setIsTyping(false);
       toast("Message delivered across the digital ocean!");
-    }, 1000 + Math.random() * 2000);
+    } catch (error: unknown) {
+      let errorMessage = "An unexpected error occurred.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast.error(errorMessage);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   return (
@@ -75,7 +101,7 @@ export const OceanChatbot = () => {
       {/* Header */}
       <header className="relative z-10 p-6 text-center">
         <h1 className="text-3xl font-bold text-foreground mb-2">
-          Ocean Chat
+          Ocean Nova Ai
         </h1>
         <p className="text-surface-foreground/80">
           Navigate the depths of conversation
